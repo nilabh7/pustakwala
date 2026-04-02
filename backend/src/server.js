@@ -70,12 +70,14 @@ app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
     const { version } = require('../package.json');
+    const email = getEmailStatus();
+    const hasEmailIssue = email.enabled && email.verifyOnStartup && !email.ready;
     res.json({
-      status: 'healthy',
+      status: hasEmailIssue ? 'degraded' : 'healthy',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV,
       version,
-      email: getEmailStatus(),
+      email,
     });
   } catch (err) {
     res.status(503).json({ status: 'unhealthy', error: err.message });
