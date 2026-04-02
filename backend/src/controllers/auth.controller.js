@@ -39,6 +39,7 @@ exports.register = async (req, res, next) => {
 
     return created(res, { user, accessToken, refreshToken }, 'Registration successful');
   } catch (err) {
+    logger.error(`Login failed for ${req.body?.email || 'unknown'}: ${err.message}`);
     next(err);
   }
 };
