@@ -80,6 +80,7 @@ app.get('/health', async (req, res) => {
       email,
     });
   } catch (err) {
+    logger.error(`Healthcheck DB probe failed: ${err.message}`);
     res.status(503).json({ status: 'unhealthy', error: err.message });
   }
 });
@@ -92,6 +93,13 @@ app.use(errorHandler);
 app.listen(PORT, async () => {
   logger.info(`Pustakwala API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
   logger.info(`API base: ${API_PREFIX}`);
+
+  try {
+    await pool.query('SELECT 1');
+    logger.info('Database connection verified');
+  } catch (err) {
+    logger.error(`Database connection verification failed: ${err.message}`);
+  }
 
   if (EMAIL_VERIFY_ON_STARTUP) {
     try {
