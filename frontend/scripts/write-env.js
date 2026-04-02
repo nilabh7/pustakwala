@@ -4,7 +4,7 @@ const path = require('path');
 const mode = process.argv[2] || 'production';
 const isProduction = mode === 'production';
 const apiUrl = process.env.FRONTEND_PUBLIC_API_URL || process.env.API_URL || (isProduction
-  ? 'https://your-railway-backend.up.railway.app/api/v1'
+  ? 'https://pustakwala-production.up.railway.app/api/v1'
   : 'http://localhost:3000/api/v1');
 
 const target = path.resolve(__dirname, '../src/environments/environment.prod.ts');
