@@ -29,7 +29,11 @@ exports.addToCart = async (req, res, next) => {
   try {
     const { book_id, quantity = 1 } = req.body;
     const { rows: bookRows } = await query(
-      'SELECT id, stock_quantity, is_active FROM books WHERE id=$1', [book_id]
+      `SELECT b.id, b.stock_quantity, b.is_active
+       FROM books b
+       JOIN seller_profiles sp ON sp.id = b.seller_id
+       WHERE b.id=$1 AND sp.status='approved'`,
+      [book_id]
     );
     if (!bookRows.length || !bookRows[0].is_active) return notFound(res, 'Book not found');
     if (bookRows[0].stock_quantity < quantity) return badRequest(res, 'Insufficient stock');
@@ -92,8 +96,11 @@ exports.getWishlist = async (req, res, next) => {
       `SELECT w.id, w.created_at,
               b.id as book_id, b.title, b.slug, b.authors,
               b.cover_image_url, b.selling_price, b.mrp, b.rating, b.stock_quantity
-       FROM wishlists w JOIN books b ON b.id=w.book_id
+       FROM wishlists w
+       JOIN books b ON b.id=w.book_id
+       JOIN seller_profiles sp ON sp.id=b.seller_id
        WHERE w.user_id=$1 AND b.is_active=TRUE
+         AND sp.status='approved'
        ORDER BY w.created_at DESC`,
       [req.user.id]
     );

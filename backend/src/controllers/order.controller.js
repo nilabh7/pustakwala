@@ -16,8 +16,10 @@ exports.placeOrder = async (req, res, next) => {
         `SELECT ci.quantity, b.id as book_id, b.title, b.selling_price,
                 b.stock_quantity, b.seller_id, b.cover_image_url,
                 b.authors, b.isbn
-         FROM cart_items ci JOIN books b ON b.id=ci.book_id
-         WHERE ci.user_id=$1 AND b.is_active=TRUE`,
+         FROM cart_items ci
+         JOIN books b ON b.id=ci.book_id
+         JOIN seller_profiles sp ON sp.id=b.seller_id
+         WHERE ci.user_id=$1 AND b.is_active=TRUE AND sp.status='approved'`,
         [req.user.id]
       );
 

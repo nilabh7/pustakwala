@@ -72,7 +72,7 @@ exports.getBook = async (req, res, next) => {
        FROM books b
        LEFT JOIN categories c ON c.id=b.category_id
        JOIN seller_profiles sp ON sp.id=b.seller_id
-       WHERE b.slug=$1 AND b.is_active=TRUE`,
+       WHERE b.slug=$1 AND b.is_active=TRUE AND sp.status='approved'`,
       [req.params.slug]
     );
     if (!rows.length) return notFound(res, 'Book not found');
@@ -220,9 +220,10 @@ exports.addReview = async (req, res, next) => {
 exports.getCategories = async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT c.*, COUNT(b.id) as book_count
+      `SELECT c.*, COUNT(sp.id) as book_count
        FROM categories c
        LEFT JOIN books b ON b.category_id=c.id AND b.is_active=TRUE
+       LEFT JOIN seller_profiles sp ON sp.id=b.seller_id AND sp.status='approved'
        WHERE c.is_active=TRUE
        GROUP BY c.id ORDER BY c.sort_order`
     );
