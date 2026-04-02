@@ -3,14 +3,24 @@ const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 
+const parseBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+};
+
 async function run() {
+  const useConnectionString = !!process.env.DATABASE_URL;
+  const sslEnabled = parseBoolean(process.env.DB_SSL, process.env.NODE_ENV === 'production');
+  const sslRejectUnauthorized = parseBoolean(process.env.DB_SSL_REJECT_UNAUTHORIZED, false);
   const client = new Client({
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
-    database: process.env.DB_NAME || 'pustakwala',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+    ...(useConnectionString ? { connectionString: process.env.DATABASE_URL } : {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT, 10) || 5432,
+      database: process.env.DB_NAME || 'pustakwala',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD,
+    }),
+    ssl: sslEnabled ? { rejectUnauthorized: sslRejectUnauthorized } : false,
   });
 
   const sqlPath = path.resolve(__dirname, '../../../database/002_seed.sql');

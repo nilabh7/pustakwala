@@ -1,122 +1,115 @@
-const nodemailer = require('nodemailer');
 const logger = require('./logger');
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isProduction = NODE_ENV === 'production';
 
-const EMAIL_ENABLED = (process.env.EMAIL_ENABLED || (isProduction ? 'true' : 'false')).toLowerCase() === 'true';
-const EMAIL_VERIFY_ON_STARTUP = (process.env.EMAIL_VERIFY_ON_STARTUP || 'true').toLowerCase() === 'true';
-const EMAIL_FAIL_FAST = (process.env.EMAIL_FAIL_FAST || (isProduction ? 'true' : 'false')).toLowerCase() === 'true';
+const parseBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+};
 
-const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-const smtpSecure = (process.env.SMTP_SECURE || String(smtpPort === 465)).toLowerCase() === 'true';
-const smtpRequireTls = (process.env.SMTP_REQUIRE_TLS || 'true').toLowerCase() === 'true';
+const EMAIL_ENABLED = parseBoolean(process.env.EMAIL_ENABLED, isProduction);
+const EMAIL_VERIFY_ON_STARTUP = parseBoolean(process.env.EMAIL_VERIFY_ON_STARTUP, true);
+const EMAIL_FAIL_FAST = parseBoolean(process.env.EMAIL_FAIL_FAST, isProduction);
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? 'resend_api' : 'smtp')).toLowerCase();
+const RESEND_API_URL = process.env.RESEND_API_URL || 'https://api.resend.com/emails';
 
-const requiredEnv = ['EMAIL_FROM', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
+const requiredEnvByProvider = {
+  resend_api: ['EMAIL_FROM', 'RESEND_API_KEY'],
+  smtp: ['EMAIL_FROM', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'],
+};
 
-function getMissingEmailEnv() {
-  return requiredEnv.filter((key) => !process.env[key]);
-}
-
-function buildTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: smtpPort,
-    secure: smtpSecure,
-    requireTLS: smtpRequireTls,
-    pool: true,
-    maxConnections: parseInt(process.env.SMTP_MAX_CONNECTIONS || '5', 10),
-    maxMessages: parseInt(process.env.SMTP_MAX_MESSAGES || '100', 10),
-    connectionTimeout: parseInt(process.env.SMTP_CONNECTION_TIMEOUT_MS || '10000', 10),
-    greetingTimeout: parseInt(process.env.SMTP_GREETING_TIMEOUT_MS || '10000', 10),
-    socketTimeout: parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || '20000', 10),
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    tls: {
-      minVersion: 'TLSv1.2',
-      rejectUnauthorized: (process.env.SMTP_TLS_REJECT_UNAUTHORIZED || 'true').toLowerCase() === 'true',
-    },
-  });
-}
-
-let transporter = null;
-let transportReady = false;
 let startupVerified = false;
+let providerReady = false;
 let startupError = null;
 
-function ensureTransportConfigured() {
-  if (!EMAIL_ENABLED) return;
-
-  const missing = getMissingEmailEnv();
-  if (!missing.length) return;
-
-  const message = `Email is enabled but missing environment variables: ${missing.join(', ')}`;
-  startupError = new Error(message);
-  if (EMAIL_FAIL_FAST) {
-    throw startupError;
-  }
-  logger.warn(message);
+function getMissingEmailEnv() {
+  const required = requiredEnvByProvider[EMAIL_PROVIDER] || ['EMAIL_FROM'];
+  return required.filter((key) => !process.env[key]);
 }
 
-function ensureTransporter() {
-  if (!EMAIL_ENABLED) return null;
-  if (transporter) return transporter;
-
-  ensureTransportConfigured();
-  if (startupError && EMAIL_FAIL_FAST) {
-    throw startupError;
+async function verifyResendConfig() {
+  const missing = getMissingEmailEnv();
+  if (missing.length) {
+    throw new Error(`Email provider ${EMAIL_PROVIDER} is missing environment variables: ${missing.join(', ')}`);
   }
-  if (getMissingEmailEnv().length) return null;
 
-  transporter = buildTransporter();
-  return transporter;
+  providerReady = true;
+  logger.info('Resend API email provider configured');
+  return { enabled: true, ready: true, provider: EMAIL_PROVIDER };
 }
 
 async function verifyEmailTransport() {
   if (!EMAIL_ENABLED) {
     startupVerified = true;
-    transportReady = false;
+    providerReady = false;
+    startupError = null;
     logger.info('Email transport disabled');
-    return { enabled: false, ready: false };
+    return { enabled: false, ready: false, provider: EMAIL_PROVIDER };
   }
 
   try {
-    const mailer = ensureTransporter();
-    if (!mailer) {
-      return { enabled: true, ready: false, error: startupError?.message || 'Email transporter not configured' };
+    let result;
+    if (EMAIL_PROVIDER === 'resend_api') {
+      result = await verifyResendConfig();
+    } else {
+      const missing = getMissingEmailEnv();
+      if (missing.length) {
+        throw new Error(`Email provider ${EMAIL_PROVIDER} is missing environment variables: ${missing.join(', ')}`);
+      }
+      providerReady = true;
+      logger.warn('SMTP email provider is configured, but Railway free tiers require HTTPS email APIs');
+      result = { enabled: true, ready: true, provider: EMAIL_PROVIDER };
     }
 
-    await mailer.verify();
     startupVerified = true;
-    transportReady = true;
     startupError = null;
-    logger.info(`Email transport verified via ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`);
-    return { enabled: true, ready: true };
+    return result;
   } catch (err) {
     startupVerified = true;
-    transportReady = false;
+    providerReady = false;
     startupError = err;
-    logger.error(`Email transport verification failed: ${err.message}`);
-    if (EMAIL_FAIL_FAST) {
-      throw err;
-    }
-    return { enabled: true, ready: false, error: err.message };
+    logger.error(`Email provider verification failed: ${err.message}`);
+    if (EMAIL_FAIL_FAST) throw err;
+    return { enabled: true, ready: false, provider: EMAIL_PROVIDER, error: err.message };
   }
 }
 
 function getEmailStatus() {
   return {
     enabled: EMAIL_ENABLED,
+    provider: EMAIL_PROVIDER,
     verifyOnStartup: EMAIL_VERIFY_ON_STARTUP,
-    ready: transportReady,
+    ready: providerReady,
     startupVerified,
     lastError: startupError?.message || null,
-    host: process.env.SMTP_HOST || null,
-    port: process.env.SMTP_PORT || null,
     from: process.env.EMAIL_FROM || null,
   };
+}
+
+async function sendWithResendApi({ to, subject, html, text, replyTo }) {
+  const response = await fetch(RESEND_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html,
+      text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      reply_to: replyTo || process.env.EMAIL_REPLY_TO || undefined,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || `Resend API failed with status ${response.status}`);
+  }
+
+  return { ok: true, messageId: payload.id };
 }
 
 async function sendMail({ to, subject, html, text, replyTo, throwOnFailure = false }) {
@@ -126,27 +119,15 @@ async function sendMail({ to, subject, html, text, replyTo, throwOnFailure = fal
   }
 
   try {
-    const mailer = ensureTransporter();
-    if (!mailer) {
-      const message = startupError?.message || 'Email transporter is not configured';
-      if (throwOnFailure) throw new Error(message);
-      logger.error(`Email skipped: ${message}`);
-      return { ok: false, skipped: true, reason: message };
+    if (EMAIL_PROVIDER !== 'resend_api') {
+      throw new Error(`Unsupported email provider for this deployment profile: ${EMAIL_PROVIDER}`);
     }
 
-    const info = await mailer.sendMail({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-      replyTo: replyTo || process.env.EMAIL_REPLY_TO || undefined,
-    });
-
-    logger.info(`Email sent to ${to}: ${subject} (${info.messageId})`);
-    return { ok: true, messageId: info.messageId };
+    const result = await sendWithResendApi({ to, subject, html, text, replyTo });
+    logger.info(`Email sent to ${Array.isArray(to) ? to.join(',') : to}: ${subject} (${result.messageId})`);
+    return result;
   } catch (err) {
-    logger.error(`Email failed to ${to}: ${err.message}`);
+    logger.error(`Email failed to ${Array.isArray(to) ? to.join(',') : to}: ${err.message}`);
     if (throwOnFailure) throw err;
     return { ok: false, error: err.message };
   }

@@ -246,6 +246,17 @@ Notes:
 - Set up SPF, DKIM, and ideally DMARC for `your-domain.com` before sending live traffic.
 - Avoid personal Gmail SMTP for production. If you temporarily use Gmail, it must be an app password, not a normal account password.
 
+## Recommended Deployment Stack
+
+Recommended hosting for this project:
+- Frontend: Vercel
+- Backend: Railway
+- Database: Supabase Postgres
+- Email: Resend API
+
+Deployment guide:
+- [DEPLOY_VERCEL_RAILWAY_SUPABASE.md](/C:/Users/nilab/pustakwala/DEPLOY_VERCEL_RAILWAY_SUPABASE.md)
+
 ---
 
 ## CI/CD Pipeline

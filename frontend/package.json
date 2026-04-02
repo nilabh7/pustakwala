@@ -4,6 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --port 4200",
+    "prebuild": "node scripts/write-env.js production",
     "build": "ng build --configuration production",
     "build:staging": "ng build --configuration staging",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
