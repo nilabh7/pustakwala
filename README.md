@@ -1,18 +1,18 @@
-# 📚 Pustakwala — Full-Stack E-Commerce Bookstore
+# Pustakwala - Full-Stack E-Commerce Bookstore
 
-> India's growing online bookstore platform — built with Angular 17, Node.js/Express, and PostgreSQL.
+> India's growing online bookstore platform - built with Angular 17, Node.js/Express, and PostgreSQL.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 pustakwala/
-├── backend/           # Node.js + Express REST API
-├── frontend/          # Angular 17 SPA
-├── database/          # PostgreSQL migrations & seed
-├── docker-compose.yml # Full stack orchestration
-└── .github/workflows/ # CI/CD pipeline
+|-- backend/           # Node.js + Express REST API
+|-- frontend/          # Angular 17 SPA
+|-- database/          # PostgreSQL migrations & seed
+|-- docker-compose.yml # Full stack orchestration
+`-- .github/workflows/ # CI/CD pipeline
 ```
 
 ### Tech Stack
@@ -30,7 +30,7 @@ pustakwala/
 
 ---
 
-## 👥 User Roles
+## User Roles
 
 | Role   | Capabilities |
 |--------|--------------|
@@ -40,7 +40,7 @@ pustakwala/
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## Quick Start (Local Development)
 
 ### Prerequisites
 - Node.js 20+
@@ -76,7 +76,7 @@ npm start          # Starts on http://localhost:4200
 
 ---
 
-## 🐳 Docker (Recommended)
+## Docker (Recommended)
 
 ```bash
 # Copy and configure environment
@@ -97,17 +97,17 @@ Services:
 
 ---
 
-## 🔑 Default Admin Credentials
+## Default Admin Credentials
 
 ```
 Email:    admin@pustakwala.com
 Password: Admin@123
 ```
-> ⚠️ Change immediately in production!
+> Change immediately in production.
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### Base URL: `http://localhost:3000/api/v1`
 
@@ -159,21 +159,21 @@ Password: Admin@123
 
 ---
 
-## 🗄️ Database Schema
+## Database Schema
 
 15+ tables with production-grade design:
-- **users** — with role-based access (buyer/seller/admin)
-- **seller_profiles** — with approval workflow
-- **books** — with full-text search (tsvector), images, tags
-- **orders + order_items** — with address snapshots
-- **cart_items, wishlists** — user shopping state
-- **reviews** — verified purchase tracking
-- **coupons** — percentage/fixed with limits
-- **addresses** — multiple per user with default
-- **notifications** — per-user notification feed
-- **audit_logs** — full admin action trail
-- **seller_payouts** — payout tracking
-- **categories** — hierarchical with icons
+- **users** - with role-based access (buyer/seller/admin)
+- **seller_profiles** - with approval workflow
+- **books** - with full-text search (tsvector), images, tags
+- **orders + order_items** - with address snapshots
+- **cart_items, wishlists** - user shopping state
+- **reviews** - verified purchase tracking
+- **coupons** - percentage/fixed with limits
+- **addresses** - multiple per user with default
+- **notifications** - per-user notification feed
+- **audit_logs** - full admin action trail
+- **seller_payouts** - payout tracking
+- **categories** - hierarchical with icons
 
 Key features:
 - UUID primary keys throughout
@@ -183,7 +183,7 @@ Key features:
 
 ---
 
-## 🔒 Security
+## Security
 
 - Passwords hashed with bcrypt (12 rounds)
 - JWT access tokens (7d) + refresh tokens (30d)
@@ -195,7 +195,7 @@ Key features:
 
 ---
 
-## 📦 Environment Variables
+## Environment Variables
 
 See `backend/.env.example` for full list. Key variables:
 
@@ -248,13 +248,13 @@ Notes:
 
 ---
 
-## 🚢 CI/CD Pipeline
+## CI/CD Pipeline
 
 GitHub Actions workflow (`.github/workflows/ci-cd.yml`):
 
 ```
-Push to develop → Run tests → Build Docker images → Deploy to Staging
-Push to main    → Run tests → Build Docker images → Deploy to Production
+Push to develop -> Run tests -> Build Docker images -> Deploy to Staging
+Push to main    -> Run tests -> Build Docker images -> Deploy to Production
 ```
 
 Required GitHub Secrets:
@@ -266,31 +266,31 @@ SLACK_WEBHOOK_URL (optional)
 
 ---
 
-## 📁 Frontend Structure
+## Frontend Structure
 
 ```
 src/app/
-├── core/
-│   ├── models/         # TypeScript interfaces
-│   ├── services/       # AuthService, BookService, CartService, etc.
-│   ├── guards/         # authGuard, adminGuard, sellerGuard
-│   └── interceptors/   # JWT auth interceptor with auto-refresh
-├── features/
-│   ├── auth/           # Login, Register, ForgotPassword, ResetPassword
-│   ├── home/           # Landing page
-│   ├── books/          # BookList, BookDetail
-│   ├── cart/           # Cart page
-│   ├── checkout/       # Checkout with address & payment
-│   ├── buyer/          # Orders, OrderDetail, Wishlist, Profile
-│   ├── seller/         # Dashboard, Books, Orders, Profile, Register
-│   └── admin/          # Dashboard, Sellers, Users, Orders, Books,
-│                       # Coupons, Categories, AuditLogs
-└── shared/             # Reusable components & pipes
+|-- core/
+|   |-- models/         # TypeScript interfaces
+|   |-- services/       # AuthService, BookService, CartService, etc.
+|   |-- guards/         # authGuard, adminGuard, sellerGuard
+|   `-- interceptors/   # JWT auth interceptor with auto-refresh
+|-- features/
+|   |-- auth/           # Login, Register, ForgotPassword, ResetPassword
+|   |-- home/           # Landing page
+|   |-- books/          # BookList, BookDetail
+|   |-- cart/           # Cart page
+|   |-- checkout/       # Checkout with address & payment
+|   |-- buyer/          # Orders, OrderDetail, Wishlist, Profile
+|   |-- seller/         # Dashboard, Books, Orders, Profile, Register
+|   `-- admin/          # Dashboard, Sellers, Users, Orders, Books,
+|                       # Coupons, Categories, AuditLogs
+`-- shared/             # Reusable components & pipes
 ```
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Backend
@@ -302,6 +302,6 @@ cd frontend && npm test
 
 ---
 
-## 📝 License
+## License
 
-MIT — Built for Pustakwala 2025
+MIT - Built for Pustakwala 2025
