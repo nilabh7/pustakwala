@@ -75,6 +75,14 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=100
 ```
 
+Ready-to-copy template:
+- [backend/railway.env.example](/C:/Users/nilab/pustakwala/backend/railway.env.example)
+
+Security note:
+- Do not commit real `DATABASE_URL`, database passwords, JWT secrets, or `RESEND_API_KEY` to Git.
+- Put the real values only in Railway project variables.
+- Because the Supabase password and Resend key were shared during setup, rotate them after deployment is stable.
+
 Notes:
 - Railway free/trial plans block SMTP, which is why this project now uses the Resend HTTP API.
 - After you verify a real domain in Resend, replace `onboarding@resend.dev` with your real sender.
