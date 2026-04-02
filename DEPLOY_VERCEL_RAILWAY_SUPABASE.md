@@ -31,6 +31,15 @@ npm run seed
 
 Deploy the `backend` folder as a Railway service.
 
+Important Railway service settings for this repo:
+- Root Directory: `/backend`
+- Config as Code path: `/backend/railway.toml`
+
+Why:
+- This repository is a monorepo.
+- Railway is failing because it is trying to build the repo root, where there is no backend `package.json` with a runnable `start` script.
+- Railway's monorepo docs recommend setting a root directory for isolated monorepos, and note that config file paths must be absolute like `/backend/railway.toml`.
+
 Set these Railway environment variables:
 
 ```env
@@ -90,12 +99,14 @@ The frontend build script writes `src/environments/environment.prod.ts` at build
 ## 4. Order of Deployment
 
 1. Create Supabase project
-2. Set Railway backend env vars
-3. Deploy Railway backend
-4. Run backend migrations and seed against Supabase
-5. Set Vercel frontend env var
-6. Deploy Vercel frontend
-7. Update `FRONTEND_URL` in Railway to include the final Vercel URL and custom domain
+2. In Railway, set Root Directory to `/backend`
+3. In Railway, set Config as Code path to `/backend/railway.toml`
+4. Set Railway backend env vars
+5. Deploy Railway backend
+6. Run backend migrations and seed against Supabase
+7. Set Vercel frontend env var
+8. Deploy Vercel frontend
+9. Update `FRONTEND_URL` in Railway to include the final Vercel URL and custom domain
 
 ## 5. Post-Deploy Checks
 
