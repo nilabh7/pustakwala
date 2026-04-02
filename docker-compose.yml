@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: pustakwala_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-pustakwala}
+      POSTGRES_USER:     ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/001_init_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/002_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - pustakwala_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend API ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pustakwala_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV:              production
+      PORT:                  3000
+      DB_HOST:               postgres
+      DB_PORT:               5432
+      DB_NAME:               ${DB_NAME:-pustakwala}
+      DB_USER:               ${DB_USER:-postgres}
+      DB_PASSWORD:           ${DB_PASSWORD:-secret}
+      JWT_SECRET:            ${JWT_SECRET:-change_this_in_production_min_32_chars}
+      JWT_REFRESH_SECRET:    ${JWT_REFRESH_SECRET:-change_refresh_secret_in_production}
+      FRONTEND_URL:          ${FRONTEND_URL:-http://localhost}
+      SMTP_HOST:             ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT:             ${SMTP_PORT:-587}
+      SMTP_USER:             ${SMTP_USER}
+      SMTP_PASS:             ${SMTP_PASS}
+      EMAIL_FROM:            ${EMAIL_FROM:-noreply@pustakwala.com}
+      PLATFORM_FEE_PERCENT:  5
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pustakwala_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pustakwala_web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    networks:
+      - pustakwala_net
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  pustakwala_net:
+    driver: bridge
