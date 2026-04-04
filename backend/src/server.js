@@ -23,6 +23,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_PREFIX = process.env.API_PREFIX || '/api/v1';
 const EMAIL_VERIFICATION_ENFORCED_AT = process.env.EMAIL_VERIFICATION_ENFORCED_AT || '2026-04-04T00:00:00.000Z';
+const DATABASE_HOST = (() => {
+  try {
+    return process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).host : (process.env.DB_HOST || 'localhost');
+  } catch {
+    return process.env.DB_HOST || 'unknown';
+  }
+})();
 
 app.set('trust proxy', 1);
 
@@ -100,6 +107,7 @@ app.use(errorHandler);
 app.listen(PORT, async () => {
   logger.info(`Pustakwala API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
   logger.info(`API base: ${API_PREFIX}`);
+  logger.info(`Database target host: ${DATABASE_HOST}`);
 
   try {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_expires TIMESTAMPTZ');
