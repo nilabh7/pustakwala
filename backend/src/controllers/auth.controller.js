@@ -22,19 +22,45 @@ exports.register = async (req, res, next) => {
       return badRequest(res, 'Invalid role. Must be buyer or seller');
     }
 
-    const existing = await query('SELECT id, is_email_verified FROM users WHERE email = $1', [email]);
-    if (existing.rows.length) return badRequest(res, 'Email already registered');
-
-    const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
     const otp = generateEmailOtp();
-
-    const { rows } = await query(
-      `INSERT INTO users (email, phone, password_hash, role, first_name, last_name, email_verify_token, email_verify_expires)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, NOW() + ($8 * INTERVAL '1 minute'))
-       RETURNING id, email, role, first_name, last_name, is_email_verified`,
-      [email, phone || null, password_hash, role, first_name, last_name, otp, EMAIL_OTP_EXPIRY_MINUTES]
+    const existing = await query(
+      'SELECT id, email, role, first_name, is_email_verified FROM users WHERE email = $1',
+      [email]
     );
-    const user = rows[0];
+
+    let user;
+    if (existing.rows.length) {
+      const currentUser = existing.rows[0];
+      if (currentUser.is_email_verified) {
+        return badRequest(res, 'Email already registered');
+      }
+
+      const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+      const { rows } = await query(
+        `UPDATE users
+         SET phone=$1,
+             password_hash=$2,
+             role=$3,
+             first_name=$4,
+             last_name=$5,
+             email_verify_token=$6,
+             email_verify_expires=NOW() + ($7 * INTERVAL '1 minute'),
+             updated_at=NOW()
+         WHERE id=$8
+         RETURNING id, email, role, first_name, last_name, is_email_verified`,
+        [phone || null, password_hash, role, first_name, last_name, otp, EMAIL_OTP_EXPIRY_MINUTES, currentUser.id]
+      );
+      user = rows[0];
+    } else {
+      const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+      const { rows } = await query(
+        `INSERT INTO users (email, phone, password_hash, role, first_name, last_name, email_verify_token, email_verify_expires)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, NOW() + ($8 * INTERVAL '1 minute'))
+         RETURNING id, email, role, first_name, last_name, is_email_verified`,
+        [email, phone || null, password_hash, role, first_name, last_name, otp, EMAIL_OTP_EXPIRY_MINUTES]
+      );
+      user = rows[0];
+    }
 
     await sendMail({
       to: email,
@@ -46,7 +72,9 @@ exports.register = async (req, res, next) => {
       role: user.role,
       verificationRequired: true,
       expiresInMinutes: EMAIL_OTP_EXPIRY_MINUTES,
-    }, 'Account created. Verify your email with the OTP we sent.');
+    }, existing.rows.length
+      ? 'This email is pending verification. We sent a fresh OTP.'
+      : 'Account created. Verify your email with the OTP we sent.');
   } catch (err) {
     logger.error(`Registration failed for ${req.body?.email || 'unknown'}: ${err.message}`);
     next(err);
@@ -61,7 +89,7 @@ exports.login = async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT u.id, u.email, u.password_hash, u.role, u.first_name, u.last_name,
-              u.is_active, u.avatar_url,
+              u.is_active, u.is_email_verified, u.avatar_url,
               sp.id as seller_id, sp.status as seller_status, sp.store_name
        FROM users u
        LEFT JOIN seller_profiles sp ON sp.user_id = u.id
