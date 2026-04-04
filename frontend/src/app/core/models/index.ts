@@ -34,6 +34,18 @@ export interface RegisterRequest {
   role: 'buyer' | 'seller';
 }
 
+export interface RegisterResponse {
+  email: string;
+  role: 'buyer' | 'seller';
+  verificationRequired: boolean;
+  expiresInMinutes: number;
+}
+
+export interface VerifyEmailOtpRequest {
+  email: string;
+  otp: string;
+}
+
 // ── BOOKS ─────────────────────────────────────────────────────
 export interface Book {
   id: string;

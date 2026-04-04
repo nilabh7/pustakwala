@@ -139,10 +139,10 @@ const templates = {
     html: `<h2>Welcome, ${name}!</h2><p>Your account is ready. Happy reading!</p>`,
     text: `Welcome, ${name}! Your account is ready. Happy reading!`,
   }),
-  verifyEmail: (name, link) => ({
-    subject: 'Verify your Pustakwala email',
-    html: `<h2>Hi ${name},</h2><p>Click <a href="${link}">here</a> to verify your email.</p>`,
-    text: `Hi ${name}, verify your email here: ${link}`,
+  verifyEmailOtp: (name, otp, minutes) => ({
+    subject: 'Your Pustakwala verification OTP',
+    html: `<h2>Hi ${name},</h2><p>Your Pustakwala verification code is <strong style="font-size:24px;letter-spacing:4px;">${otp}</strong>.</p><p>This OTP expires in ${minutes} minutes.</p>`,
+    text: `Hi ${name}, your Pustakwala verification OTP is ${otp}. It expires in ${minutes} minutes.`,
   }),
   passwordReset: (name, link) => ({
     subject: 'Reset your Pustakwala password',

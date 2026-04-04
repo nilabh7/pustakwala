@@ -28,7 +28,12 @@ router.post('/auth/forgot-password', [body('email').isEmail()], validate, authCt
 router.post('/auth/reset-password',
   [body('token').notEmpty(), body('password').isLength({ min: 8 })],
   validate, authCtrl.resetPassword);
-router.post('/auth/verify-email', [body('token').notEmpty()], validate, authCtrl.verifyEmail);
+router.post('/auth/verify-email',
+  [body('email').isEmail(), body('otp').isLength({ min: 6, max: 6 })],
+  validate, authCtrl.verifyEmail);
+router.post('/auth/resend-verification-otp',
+  [body('email').isEmail()],
+  validate, authCtrl.resendVerificationOtp);
 router.get('/auth/me', authenticate, authCtrl.me);
 router.put('/auth/change-password', authenticate,
   [body('current_password').notEmpty(), body('new_password').isLength({ min: 8 })],

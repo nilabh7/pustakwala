@@ -4,7 +4,15 @@ import { Router } from '@angular/router';
 import { tap, catchError } from 'rxjs/operators';
 import { Observable, throwError } from 'rxjs';
 import { environment } from '@env/environment';
-import { User, AuthResponse, LoginRequest, RegisterRequest, ApiResponse } from '../models';
+import {
+  User,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  RegisterResponse,
+  VerifyEmailOtpRequest,
+  ApiResponse
+} from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -22,10 +30,8 @@ export class AuthService {
 
   constructor(private http: HttpClient, private router: Router) {}
 
-  register(data: RegisterRequest): Observable<ApiResponse<AuthResponse>> {
-    return this.http.post<ApiResponse<AuthResponse>>(`${this.API}/auth/register`, data).pipe(
-      tap(res => this.storeSession(res.data))
-    );
+  register(data: RegisterRequest): Observable<ApiResponse<RegisterResponse>> {
+    return this.http.post<ApiResponse<RegisterResponse>>(`${this.API}/auth/register`, data);
   }
 
   login(data: LoginRequest): Observable<ApiResponse<AuthResponse>> {
@@ -66,8 +72,12 @@ export class AuthService {
     return this.http.post(`${this.API}/auth/reset-password`, { token, password });
   }
 
-  verifyEmail(token: string) {
-    return this.http.post(`${this.API}/auth/verify-email`, { token });
+  verifyEmail(data: VerifyEmailOtpRequest) {
+    return this.http.post<ApiResponse>(`${this.API}/auth/verify-email`, data);
+  }
+
+  resendVerificationOtp(email: string) {
+    return this.http.post<ApiResponse<{ expiresInMinutes?: number }>>(`${this.API}/auth/resend-verification-otp`, { email });
   }
 
   changePassword(current_password: string, new_password: string) {

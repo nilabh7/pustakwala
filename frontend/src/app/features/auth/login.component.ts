@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -17,6 +17,7 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
 
         <div class="error-msg" *ngIf="error">{{ error }}</div>
+        <div class="success-msg" *ngIf="success">{{ success }}</div>
 
         <form (ngSubmit)="onLogin()">
           <div class="form-group">
@@ -63,6 +64,8 @@ import { AuthService } from '../../core/services/auth.service';
     .auth-title { font-size:16px; color:#7A6855; margin-top:6px; }
     .error-msg { background:#FFF0F0; color:#C0392B; border:1px solid #FFCDD2;
       border-radius:8px; padding:12px; margin-bottom:16px; font-size:14px; }
+    .success-msg { background:#F0FFF4; color:#276749; border:1px solid #9AE6B4;
+      border-radius:8px; padding:12px; margin-bottom:16px; font-size:14px; }
     .form-group { margin-bottom:18px; }
     .form-group label { display:block; font-size:13px; font-weight:600;
       color:#1A0F00; margin-bottom:6px; }
@@ -87,15 +90,25 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class LoginComponent {
   auth = inject(AuthService);
+  router = inject(Router);
   email = '';
   password = '';
   showPw = false;
   loading = false;
   error = '';
+  success = '';
+
+  constructor() {
+    const navigation = this.router.getCurrentNavigation();
+    const state = navigation?.extras.state as { verifiedEmail?: string; successMessage?: string } | undefined;
+    if (state?.verifiedEmail) this.email = state.verifiedEmail;
+    if (state?.successMessage) this.success = state.successMessage;
+  }
 
   onLogin() {
     this.loading = true;
     this.error = '';
+    this.success = '';
     this.auth.login({ email: this.email, password: this.password }).subscribe({
       next: () => this.auth.redirectAfterLogin(),
       error: (err) => {

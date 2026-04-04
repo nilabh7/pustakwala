@@ -34,6 +34,7 @@ CREATE TABLE users (
     is_active       BOOLEAN DEFAULT TRUE,
     is_email_verified BOOLEAN DEFAULT FALSE,
     email_verify_token VARCHAR(255),
+    email_verify_expires TIMESTAMPTZ,
     password_reset_token VARCHAR(255),
     password_reset_expires TIMESTAMPTZ,
     last_login      TIMESTAMPTZ,

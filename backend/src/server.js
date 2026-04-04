@@ -54,6 +54,8 @@ const authLimiter = rateLimit({
 
 app.use(`${API_PREFIX}/auth/login`, authLimiter);
 app.use(`${API_PREFIX}/auth/register`, authLimiter);
+app.use(`${API_PREFIX}/auth/verify-email`, authLimiter);
+app.use(`${API_PREFIX}/auth/resend-verification-otp`, authLimiter);
 app.use(API_PREFIX, limiter);
 
 app.use(compression());
@@ -97,6 +99,8 @@ app.listen(PORT, async () => {
   logger.info(`API base: ${API_PREFIX}`);
 
   try {
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_expires TIMESTAMPTZ');
+    logger.info('Auth verification schema ensured');
     await pool.query('SELECT 1');
     logger.info('Database connection verified');
   } catch (err) {

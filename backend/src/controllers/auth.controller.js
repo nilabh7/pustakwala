@@ -1,45 +1,54 @@
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
-const { query, withTransaction } = require('../models/db');
+const { query } = require('../models/db');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { sendMail, templates } = require('../utils/email');
-const { success, created, badRequest, unauthorized, error } = require('../utils/response');
+const { success, created, badRequest, unauthorized } = require('../utils/response');
 const logger = require('../utils/logger');
 
 const SALT_ROUNDS = 12;
+const EMAIL_OTP_EXPIRY_MINUTES = parseInt(process.env.EMAIL_OTP_EXPIRY_MINUTES, 10) || 10;
+
+const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
+const generateEmailOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // POST /auth/register
 exports.register = async (req, res, next) => {
   try {
-    const { email, password, first_name, last_name, phone, role = 'buyer' } = req.body;
+    const { password, first_name, last_name, phone, role = 'buyer' } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     if (!['buyer', 'seller'].includes(role)) {
       return badRequest(res, 'Invalid role. Must be buyer or seller');
     }
 
-    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await query('SELECT id, is_email_verified FROM users WHERE email = $1', [email]);
     if (existing.rows.length) return badRequest(res, 'Email already registered');
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
-    const verifyToken = uuidv4();
+    const otp = generateEmailOtp();
 
     const { rows } = await query(
-      `INSERT INTO users (email, phone, password_hash, role, first_name, last_name, email_verify_token)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, email, role, first_name, last_name`,
-      [email, phone || null, password_hash, role, first_name, last_name, verifyToken]
+      `INSERT INTO users (email, phone, password_hash, role, first_name, last_name, email_verify_token, email_verify_expires)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, NOW() + ($8 * INTERVAL '1 minute'))
+       RETURNING id, email, role, first_name, last_name, is_email_verified`,
+      [email, phone || null, password_hash, role, first_name, last_name, otp, EMAIL_OTP_EXPIRY_MINUTES]
     );
     const user = rows[0];
 
-    // Send welcome email
-    const verifyLink = `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`;
-    await sendMail({ to: email, ...templates.verifyEmail(first_name, verifyLink) });
+    await sendMail({
+      to: email,
+      ...templates.verifyEmailOtp(first_name, otp, EMAIL_OTP_EXPIRY_MINUTES),
+    });
 
-    const accessToken = generateAccessToken({ id: user.id, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user.id });
-
-    return created(res, { user, accessToken, refreshToken }, 'Registration successful');
+    return created(res, {
+      email: user.email,
+      role: user.role,
+      verificationRequired: true,
+      expiresInMinutes: EMAIL_OTP_EXPIRY_MINUTES,
+    }, 'Account created. Verify your email with the OTP we sent.');
   } catch (err) {
-    logger.error(`Login failed for ${req.body?.email || 'unknown'}: ${err.message}`);
+    logger.error(`Registration failed for ${req.body?.email || 'unknown'}: ${err.message}`);
     next(err);
   }
 };
@@ -47,7 +56,8 @@ exports.register = async (req, res, next) => {
 // POST /auth/login
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const password = req.body.password;
+    const email = normalizeEmail(req.body.email);
 
     const { rows } = await query(
       `SELECT u.id, u.email, u.password_hash, u.role, u.first_name, u.last_name,
@@ -63,6 +73,7 @@ exports.login = async (req, res, next) => {
     const user = rows[0];
 
     if (!user.is_active) return unauthorized(res, 'Account has been deactivated');
+    if (!user.is_email_verified) return unauthorized(res, 'Please verify your email before logging in');
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return unauthorized(res, 'Invalid email or password');
@@ -102,7 +113,7 @@ exports.refresh = async (req, res, next) => {
 // POST /auth/forgot-password
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const email = normalizeEmail(req.body.email);
     const { rows } = await query('SELECT id, first_name FROM users WHERE email = $1', [email]);
     // Always return success (security: don't reveal if email exists)
     if (rows.length) {
@@ -145,13 +156,63 @@ exports.resetPassword = async (req, res, next) => {
 // POST /auth/verify-email
 exports.verifyEmail = async (req, res, next) => {
   try {
-    const { token } = req.body;
-    const { rows } = await query(
-      'UPDATE users SET is_email_verified=TRUE, email_verify_token=NULL WHERE email_verify_token=$1 RETURNING id',
-      [token]
+    const email = normalizeEmail(req.body.email);
+    const otp = String(req.body.otp || '').trim();
+
+    const existing = await query(
+      'SELECT id, is_email_verified FROM users WHERE email = $1',
+      [email]
     );
-    if (!rows.length) return badRequest(res, 'Invalid verification token');
+
+    if (!existing.rows.length) return badRequest(res, 'Invalid email or OTP');
+    if (existing.rows[0].is_email_verified) return success(res, {}, 'Email already verified');
+
+    const { rows } = await query(
+      `UPDATE users
+       SET is_email_verified=TRUE, email_verify_token=NULL, email_verify_expires=NULL
+       WHERE email=$1 AND email_verify_token=$2 AND email_verify_expires > NOW()
+       RETURNING id`,
+      [email, otp]
+    );
+    if (!rows.length) return badRequest(res, 'Invalid or expired OTP');
     return success(res, {}, 'Email verified successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /auth/resend-verification-otp
+exports.resendVerificationOtp = async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const { rows } = await query(
+      'SELECT id, first_name, is_email_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (!rows.length) {
+      return success(res, {}, 'If that email exists, a verification OTP has been sent');
+    }
+
+    const user = rows[0];
+    if (user.is_email_verified) {
+      return success(res, {}, 'Email is already verified');
+    }
+
+    const otp = generateEmailOtp();
+    await query(
+      `UPDATE users
+       SET email_verify_token=$1, email_verify_expires=NOW() + ($2 * INTERVAL '1 minute')
+       WHERE id=$3`,
+      [otp, EMAIL_OTP_EXPIRY_MINUTES, user.id]
+    );
+
+    await sendMail({
+      to: email,
+      ...templates.verifyEmailOtp(user.first_name, otp, EMAIL_OTP_EXPIRY_MINUTES),
+    });
+
+    return success(res, { expiresInMinutes: EMAIL_OTP_EXPIRY_MINUTES }, 'A new verification OTP has been sent');
   } catch (err) {
     next(err);
   }
