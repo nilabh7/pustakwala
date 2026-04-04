@@ -24,6 +24,8 @@ const PORT = process.env.PORT || 3000;
 const API_PREFIX = process.env.API_PREFIX || '/api/v1';
 const EMAIL_VERIFICATION_ENFORCED_AT = process.env.EMAIL_VERIFICATION_ENFORCED_AT || '2026-04-04T00:00:00.000Z';
 
+app.set('trust proxy', 1);
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));

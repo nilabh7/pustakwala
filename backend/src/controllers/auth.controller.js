@@ -8,6 +8,9 @@ const logger = require('../utils/logger');
 
 const SALT_ROUNDS = 12;
 const EMAIL_OTP_EXPIRY_MINUTES = parseInt(process.env.EMAIL_OTP_EXPIRY_MINUTES, 10) || 10;
+const EMAIL_VERIFICATION_ENFORCED_AT = new Date(
+  process.env.EMAIL_VERIFICATION_ENFORCED_AT || '2026-04-04T00:00:00.000Z'
+);
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const generateEmailOtp = () => String(Math.floor(100000 + Math.random() * 900000));
@@ -89,7 +92,7 @@ exports.login = async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT u.id, u.email, u.password_hash, u.role, u.first_name, u.last_name,
-              u.is_active, u.is_email_verified, u.avatar_url,
+              u.is_active, u.is_email_verified, u.avatar_url, u.created_at,
               sp.id as seller_id, sp.status as seller_status, sp.store_name
        FROM users u
        LEFT JOIN seller_profiles sp ON sp.user_id = u.id
@@ -99,9 +102,12 @@ exports.login = async (req, res, next) => {
 
     if (!rows.length) return unauthorized(res, 'Invalid email or password');
     const user = rows[0];
+    const accountCreatedAt = user.created_at ? new Date(user.created_at) : null;
+    const requiresEmailVerification = !user.is_email_verified
+      && (!accountCreatedAt || accountCreatedAt >= EMAIL_VERIFICATION_ENFORCED_AT);
 
     if (!user.is_active) return unauthorized(res, 'Account has been deactivated');
-    if (!user.is_email_verified) return unauthorized(res, 'Please verify your email before logging in');
+    if (requiresEmailVerification) return unauthorized(res, 'Please verify your email before logging in');
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return unauthorized(res, 'Invalid email or password');
