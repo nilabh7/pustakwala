@@ -106,10 +106,6 @@ exports.login = async (req, res, next) => {
     const requiresEmailVerification = !user.is_email_verified
       && (!accountCreatedAt || accountCreatedAt >= EMAIL_VERIFICATION_ENFORCED_AT);
 
-    logger.info(
-      `Login verification check for ${email}: verified=${user.is_email_verified}, created_at=${user.created_at}, cutoff=${EMAIL_VERIFICATION_ENFORCED_AT.toISOString()}, requires_verification=${requiresEmailVerification}`
-    );
-
     if (!user.is_active) return unauthorized(res, 'Account has been deactivated');
     if (requiresEmailVerification) return unauthorized(res, 'Please verify your email before logging in');
 
