@@ -22,6 +22,7 @@ if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_PREFIX = process.env.API_PREFIX || '/api/v1';
+const EMAIL_VERIFICATION_ENFORCED_AT = process.env.EMAIL_VERIFICATION_ENFORCED_AT || '2026-04-04T00:00:00.000Z';
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -101,6 +102,19 @@ app.listen(PORT, async () => {
   try {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_expires TIMESTAMPTZ');
     logger.info('Auth verification schema ensured');
+    const backfillResult = await pool.query(
+      `UPDATE users
+       SET is_email_verified = TRUE,
+           email_verify_token = NULL,
+           email_verify_expires = NULL,
+           updated_at = NOW()
+       WHERE is_email_verified = FALSE
+         AND created_at < $1::timestamptz`,
+      [EMAIL_VERIFICATION_ENFORCED_AT]
+    );
+    if (backfillResult.rowCount > 0) {
+      logger.info(`Auto-verified ${backfillResult.rowCount} existing accounts created before ${EMAIL_VERIFICATION_ENFORCED_AT}`);
+    }
     await pool.query('SELECT 1');
     logger.info('Database connection verified');
   } catch (err) {
